@@ -1,11 +1,37 @@
 # @nuxie/react-native
 
-Expo-first React Native bridge for Nuxie.
+React Native SDK for Nuxie.
 
-- Native runtime lives in Nuxie SDKs (`nuxie-ios`, `nuxie-android`).
-- JS layer is intentionally thin and ergonomic.
-- Works in Expo prebuild/dev client and bare React Native.
-- Not supported in Expo Go.
+`@nuxie/react-native` is a thin, native-first bridge over:
+
+- Nuxie iOS SDK (`nuxie-ios`)
+- Nuxie Android SDK (`nuxie-android`)
+
+It gives you an ergonomic React Native API while keeping runtime behavior in native SDKs.
+
+## Why This SDK
+
+- Native truth: no duplicated trigger/feature/paywall runtime logic in JS.
+- Expo-first ergonomics: config plugin + Expo module bridge.
+- Bare RN support: same JS API, native linkage in your app.
+- Optional React layer: use imperative API only, or add provider/hooks.
+
+## Platform Support
+
+| Runtime | Status | Notes |
+| --- | --- | --- |
+| Expo Dev Client / Prebuild | Supported | Recommended path |
+| Bare React Native | Supported | Manual native setup required |
+| Expo Go | Not supported | Native bridge module is required |
+
+## Documentation
+
+- [Getting Started](./docs/getting-started.md)
+- [Expo Setup](./docs/expo-setup.md)
+- [Bare React Native Setup](./docs/bare-react-native-setup.md)
+- [API Reference](./docs/api-reference.md)
+- [Purchase Controller Guide](./docs/purchase-controller.md)
+- [Troubleshooting](./docs/troubleshooting.md)
 
 ## Install
 
@@ -13,15 +39,65 @@ Expo-first React Native bridge for Nuxie.
 bun add @nuxie/react-native
 ```
 
-Peer dependencies:
+Peer requirements:
 
-- `react`
-- `react-native`
-- `expo` (for Expo module runtime and plugin)
+- `react` >= 18
+- `react-native` >= 0.72
+- `expo` >= 50
 
-## Expo Setup
+## Fast Start (Imperative API)
 
-Add the config plugin to your app config if you want native API-key fallback:
+```ts
+import { Nuxie } from "@nuxie/react-native";
+
+await Nuxie.configure({
+  apiKey: "NX_PROD_...", // optional when using plugin-provided NUXIE_API_KEY
+  environment: "production",
+});
+
+await Nuxie.identify("user_123", {
+  userProperties: { plan: "pro" },
+});
+
+const trigger = Nuxie.trigger("paywall_opened", {
+  properties: { source: "settings" },
+});
+
+trigger.onUpdate((update) => {
+  console.log("update", update);
+});
+
+const terminal = await trigger.done;
+console.log("terminal", terminal);
+```
+
+## Fast Start (React Layer)
+
+```tsx
+import { NuxieProvider, useFeature, useTrigger } from "@nuxie/react-native";
+
+export function App() {
+  return (
+    <NuxieProvider
+      config={{
+        apiKey: "NX_PROD_...",
+        environment: "production",
+      }}
+    >
+      <Screen />
+    </NuxieProvider>
+  );
+}
+
+function Screen() {
+  const feature = useFeature("pro_export", { refreshOnMount: true });
+  const trigger = useTrigger();
+
+  return null;
+}
+```
+
+## Expo Plugin (Optional API Key Fallback)
 
 ```json
 {
@@ -38,76 +114,39 @@ Add the config plugin to your app config if you want native API-key fallback:
 }
 ```
 
-The plugin writes `NUXIE_API_KEY` into iOS Info.plist and Android manifest metadata.
+The plugin sets `NUXIE_API_KEY` in native config.
 
-At runtime, key precedence is:
+`configure()` API key precedence:
 
-1. `apiKey` passed to `configure(...)`
+1. `options.apiKey`
 2. plugin-provided `NUXIE_API_KEY`
-3. throw `MISSING_API_KEY`
+3. throws `MISSING_API_KEY`
 
-## Quick Start (Imperative)
+## Trigger Contract
 
-```ts
-import { Nuxie } from "@nuxie/react-native";
+`trigger()` returns a `TriggerOperation`:
 
-await Nuxie.configure({
-  apiKey: "NX_PROD_...", // optional if plugin key is configured
-  environment: "production",
-});
+- `requestId`
+- `cancel()`
+- `onUpdate(listener)`
+- `done` promise (resolves only on terminal update)
 
-await Nuxie.identify("user_123");
+Terminal update categories:
 
-const op = Nuxie.trigger("premium_feature_tapped", {
-  properties: { source: "editor" },
-});
-
-op.onUpdate((update) => {
-  console.log("trigger update", update);
-});
-
-const terminal = await op.done;
-console.log("terminal update", terminal);
-```
-
-## React Layer (Optional)
-
-```tsx
-import { NuxieProvider, useFeature, useTrigger } from "@nuxie/react-native";
-
-function App() {
-  return (
-    <NuxieProvider config={{ apiKey: "NX_PROD_..." }}>
-      <Screen />
-    </NuxieProvider>
-  );
-}
-
-function Screen() {
-  const feature = useFeature("pro_export", { refreshOnMount: true });
-  const trigger = useTrigger();
-
-  return null;
-}
-```
-
-### Available hooks
-
-- `useNuxieClient()`
-- `useFeature(featureId, options?)`
-- `useTrigger()`
-- `useNuxieEvents(callbacks)`
+- `error`
+- `journey`
+- `decision` with: `no_match`, `suppressed`, `allowed_immediate`, `denied_immediate`
+- `entitlement` with: `allowed`, `denied`
 
 ## Purchase Controller Bridge
 
-If your app owns purchases (RevenueCat, custom billing, etc.), provide a purchase controller.
+If your app owns purchase execution (RevenueCat, BillingClient wrapper, custom StoreKit flow), wire a `NuxiePurchaseController`:
 
 ```ts
 import { NuxieProvider, type NuxiePurchaseController } from "@nuxie/react-native";
 
 const purchaseController: NuxiePurchaseController = {
   async onPurchase(request) {
-    // Run purchase with your billing layer
     return {
       type: "success",
       productId: request.productId,
@@ -122,67 +161,37 @@ const purchaseController: NuxiePurchaseController = {
 <NuxieProvider
   config={{ apiKey: "NX_PROD_...", usePurchaseController: true }}
   purchaseController={purchaseController}
-/>
+/>;
 ```
 
-Native requests time out after 60s if no completion is returned.
+Outstanding purchase/restore requests have a native timeout (60s).
 
-## API Surface
+## Example App + Runability Verification
 
-`Nuxie` singleton and `NuxieClient` expose:
+A full Expo example app lives in [`example/`](./example):
 
-- `configure(options)`
-- `shutdown()`
-- `identify(distinctId, opts?)`
-- `reset(opts?)`
-- `getDistinctId()`
-- `getAnonymousId()`
-- `isIdentified()`
-- `trigger(eventName, opts?)`
-- `triggerOnce(eventName, opts?)`
-- `showFlow(flowId)`
-- `refreshProfile()`
-- `hasFeature(featureId, opts?)`
-- `getCachedFeature(featureId, opts?)`
-- `checkFeature(featureId, opts?)`
-- `refreshFeature(featureId, opts?)`
-- `useFeature(featureId, opts?)`
-- `useFeatureAndWait(featureId, opts?)`
-- `flushEvents()`
-- `getQueuedEventCount()`
-- `pauseEventQueue()`
-- `resumeEventQueue()`
-- `on(eventName, listener)`
-- `setPurchaseController(controller)`
+```bash
+cd example
+bun install
+bun run verify
+```
 
-## Trigger Terminal Semantics
+`verify` checks:
 
-`TriggerOperation.done` resolves on terminal updates only:
-
-- `error`
-- `journey`
-- `decision.no_match`
-- `decision.suppressed`
-- `decision.allowed_immediate`
-- `decision.denied_immediate`
-- `entitlement.allowed`
-- `entitlement.denied`
-
-## Bare React Native Setup
-
-### iOS
-
-- Ensure the Nuxie iOS SDK is available to your app target (SPM or pod integration).
-- Run pod install after linking this package.
-
-### Android
-
-- Ensure your app resolves `io.nuxie:nuxie-android`.
-- Build with standard React Native autolinking (or Expo prebuild for managed workflow).
+- SDK build
+- example TypeScript compile
+- Expo config resolution
+- Android prebuild generation
+- iOS prebuild generation
 
 ## Development
 
 ```bash
 bun run typecheck
 bun test
+bun run build
 ```
+
+## License
+
+MIT
