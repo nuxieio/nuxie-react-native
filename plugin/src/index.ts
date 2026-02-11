@@ -1,4 +1,4 @@
-import { AndroidConfig, type ConfigPlugin, withAndroidManifest, withInfoPlist } from "expo/config-plugins";
+import { AndroidConfig, type ConfigPlugin, withAndroidManifest, withInfoPlist } from "@expo/config-plugins";
 
 export type NuxiePluginOptions = {
   apiKey?: string;

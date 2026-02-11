@@ -1,4 +1,4 @@
-const { AndroidConfig, withAndroidManifest, withInfoPlist } = require("expo/config-plugins");
+const { AndroidConfig, withAndroidManifest, withInfoPlist } = require("@expo/config-plugins");
 
 function withNuxieApiKey(config, options = {}) {
   const apiKey = options.apiKey;
