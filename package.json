@@ -1,0 +1,46 @@
+{
+  "name": "@nuxie/react-native",
+  "version": "0.1.0",
+  "description": "React Native SDK for Nuxie",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "ios",
+    "android",
+    "plugin",
+    "expo-module.config.json"
+  ],
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --format esm --sourcemap && tsc --declaration --emitDeclarationOnly --outDir dist",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "clean": "rm -rf dist coverage"
+  },
+  "keywords": [
+    "nuxie",
+    "react-native",
+    "expo",
+    "sdk"
+  ],
+  "author": "Nuxie",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=18",
+    "react-native": ">=0.72"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19",
+    "typescript": "5.8.2"
+  }
+}
