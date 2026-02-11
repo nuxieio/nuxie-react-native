@@ -40,7 +40,7 @@ export interface NuxieConfigurationOptions {
 }
 
 export interface NuxieConfigureOptions extends NuxieConfigurationOptions {
-  apiKey: string;
+  apiKey?: string;
   usePurchaseController?: boolean;
 }
 
@@ -178,8 +178,12 @@ export interface FlowPresentedEvent {
 }
 
 export interface FlowDismissedEvent {
-  flowId: string;
-  reason?: string;
+  flowId?: string | null;
+  reason?: string | null;
+  journeyId?: string;
+  campaignId?: string | null;
+  screenId?: string | null;
+  error?: string | null;
   timestampMs: number;
 }
 

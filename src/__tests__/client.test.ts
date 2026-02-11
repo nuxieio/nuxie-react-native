@@ -38,6 +38,33 @@ describe("NuxieClient", () => {
     expect(client.isConfigured).toBe(true);
   });
 
+  test("configure uses native default api key when explicit key is missing", async () => {
+    const module = new TestNativeModule();
+    module.defaultApiKey = "NX_FROM_PLUGIN";
+    const client = new NuxieClient(async () => module);
+
+    await client.configure({
+      flushAt: 10,
+    });
+
+    expect(module.configureArgs?.apiKey).toBe("NX_FROM_PLUGIN");
+    expect(module.configureArgs?.options).toEqual({ flushAt: 10 });
+    expect(client.isConfigured).toBe(true);
+  });
+
+  test("configure throws when api key is missing in both JS config and native defaults", async () => {
+    const module = new TestNativeModule();
+    const client = new NuxieClient(async () => module);
+
+    await expect(
+      client.configure({
+        flushAt: 20,
+      }),
+    ).rejects.toMatchObject({
+      code: "MISSING_API_KEY",
+    });
+  });
+
   test("trigger resolves only when a terminal update is emitted", async () => {
     const module = new TestNativeModule();
     const client = new NuxieClient(async () => module);

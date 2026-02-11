@@ -1,0 +1,10 @@
+{
+  "name": "NuxieExpo",
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["NuxieExpoModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.nuxieexpo.NuxieExpoModule"]
+  }
+}

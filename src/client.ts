@@ -46,6 +46,8 @@ type ClientListenerMap = {
   [K in ClientEventName]: Set<(payload: NuxieClientEventMap[K]) => void>;
 };
 
+type NuxieClientErrorCode = "MISSING_API_KEY";
+
 const CLIENT_TO_NATIVE_EVENT: Record<ClientEventName, NuxieNativeEventName> = {
   triggerUpdate: "onTriggerUpdate",
   featureAccessChanged: "onFeatureAccessChanged",
@@ -60,6 +62,12 @@ function generateRequestId(): string {
     return globalThis.crypto.randomUUID();
   }
   return `trigger-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createClientError(code: NuxieClientErrorCode, message: string): Error & { code: NuxieClientErrorCode } {
+  const error = new Error(message) as Error & { code: NuxieClientErrorCode };
+  error.code = code;
+  return error;
 }
 
 function isTerminalTriggerUpdate(update: TriggerUpdate): update is TriggerTerminalUpdate {
@@ -295,9 +303,22 @@ export class NuxieClient {
     this.configuring = true;
     try {
       const module = await this.module();
+      const explicitApiKey = options.apiKey?.trim();
+      const defaultApiKey =
+        explicitApiKey == null || explicitApiKey.length === 0
+          ? await module.getDefaultApiKey?.().catch(() => null)
+          : null;
+      const apiKey = explicitApiKey && explicitApiKey.length > 0 ? explicitApiKey : defaultApiKey?.trim();
+      if (apiKey == null || apiKey.length === 0) {
+        throw createClientError(
+          "MISSING_API_KEY",
+          "Nuxie API key is required. Pass apiKey to configure() or set NUXIE_API_KEY via the Expo config plugin.",
+        );
+      }
+
       const config = toNativeConfiguration(options);
       const usePurchaseController = options.usePurchaseController === true || this.purchaseController != null;
-      await module.configure(options.apiKey, config, usePurchaseController, WRAPPER_VERSION);
+      await module.configure(apiKey, config, usePurchaseController, WRAPPER_VERSION);
       await this.ensureNativeSubscription("onTriggerUpdate");
       await this.ensureNativeSubscription("onFeatureAccessChanged");
       if (usePurchaseController) {

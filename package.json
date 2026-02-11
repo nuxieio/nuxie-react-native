@@ -10,6 +10,7 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
+    "./plugin": "./app.plugin.js",
     "./package.json": "./package.json"
   },
   "files": [
@@ -18,6 +19,7 @@
     "ios",
     "android",
     "plugin",
+    "app.plugin.js",
     "expo-module.config.json"
   ],
   "scripts": {
@@ -35,12 +37,14 @@
   "author": "Nuxie",
   "license": "MIT",
   "peerDependencies": {
+    "expo": ">=50",
     "react": ">=18",
     "react-native": ">=0.72"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/react": "^19",
+    "expo-config-plugins": "^10.1.1",
     "typescript": "5.8.2"
   }
 }

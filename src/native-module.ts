@@ -45,8 +45,12 @@ export type NuxieNativeEventMap = {
     timestampMs: number;
   };
   onFlowDismissed: {
-    flowId: string;
-    reason?: string;
+    flowId?: string | null;
+    reason?: string | null;
+    journeyId?: string;
+    campaignId?: string | null;
+    screenId?: string | null;
+    error?: string | null;
     timestampMs: number;
   };
 };
@@ -58,6 +62,7 @@ export interface NuxieNativeSubscription {
 }
 
 export interface NuxieNativeModule {
+  getDefaultApiKey(): Promise<string | null>;
   configure(
     apiKey: string,
     options?: NuxieConfigurationOptions,

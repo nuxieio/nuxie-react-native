@@ -36,6 +36,7 @@ export class TestNativeModule implements NuxieNativeModule {
     usePurchaseController?: boolean;
     wrapperVersion?: string;
   } | null = null;
+  public defaultApiKey: string | null = null;
   public triggerStarts: Array<{ requestId: string; eventName: string; options?: TriggerOptions }> = [];
   public cancelledRequestIds: string[] = [];
   public completedPurchases: Array<{ requestId: string; result: PurchaseResult }> = [];
@@ -68,6 +69,10 @@ export class TestNativeModule implements NuxieNativeModule {
     wrapperVersion?: string,
   ): Promise<void> {
     this.configureArgs = { apiKey, options, usePurchaseController, wrapperVersion };
+  }
+
+  async getDefaultApiKey(): Promise<string | null> {
+    return this.defaultApiKey;
   }
 
   async shutdown(): Promise<void> {}
