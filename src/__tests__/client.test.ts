@@ -145,4 +145,132 @@ describe("NuxieClient", () => {
       decision: { type: "allowed_immediate" },
     });
   });
+
+  test("client forwards feature change and trigger update events to listeners", async () => {
+    const module = new TestNativeModule();
+    const client = new NuxieClient(async () => module);
+
+    const triggerEvents: string[] = [];
+    const featureEvents: string[] = [];
+
+    const unsubTrigger = client.on("triggerUpdate", (payload) => {
+      triggerEvents.push(payload.requestId);
+    });
+    const unsubFeature = client.on("featureAccessChanged", (payload) => {
+      featureEvents.push(payload.featureId);
+    });
+
+    const op = client.trigger("event_with_listener");
+    await waitFor(() => module.triggerStarts.length === 1);
+    const requestId = module.triggerStarts[0]!.requestId;
+
+    module.emit("onTriggerUpdate", triggerUpdate(requestId, { kind: "decision", decision: { type: "allowed_immediate" } }));
+    module.emit("onFeatureAccessChanged", {
+      featureId: "pro_export",
+      from: null,
+      to: { allowed: true, unlimited: false, balance: 10, type: "metered" },
+      timestampMs: Date.now(),
+    });
+
+    await op.done;
+    unsubTrigger();
+    unsubFeature();
+
+    expect(triggerEvents).toEqual([requestId]);
+    expect(featureEvents).toEqual(["pro_export"]);
+  });
+
+  test("purchase controller receives purchase and restore requests and completes native callbacks", async () => {
+    const module = new TestNativeModule();
+    const client = new NuxieClient(async () => module);
+
+    client.setPurchaseController({
+      async onPurchase(request) {
+        expect(request.productId).toBe("sku_premium");
+        return { type: "success", productId: request.productId, purchaseToken: "tok_123" };
+      },
+      async onRestore() {
+        return { type: "success", restoredCount: 2 };
+      },
+    });
+    await client.configure({ apiKey: "NX_TEST", usePurchaseController: true });
+
+    module.emit("onPurchaseRequest", {
+      requestId: "p_1",
+      platform: "android",
+      productId: "sku_premium",
+      basePlanId: null,
+      offerId: null,
+      timestampMs: Date.now(),
+    });
+    module.emit("onRestoreRequest", {
+      requestId: "r_1",
+      platform: "android",
+      timestampMs: Date.now(),
+    });
+
+    await waitFor(() => module.completedPurchases.length === 1);
+    await waitFor(() => module.completedRestores.length === 1);
+
+    expect(module.completedPurchases[0]).toEqual({
+      requestId: "p_1",
+      result: {
+        type: "success",
+        productId: "sku_premium",
+        purchaseToken: "tok_123",
+      },
+    });
+    expect(module.completedRestores[0]).toEqual({
+      requestId: "r_1",
+      result: {
+        type: "success",
+        restoredCount: 2,
+      },
+    });
+  });
+
+  test("purchase controller failures map to failed completion payloads", async () => {
+    const module = new TestNativeModule();
+    const client = new NuxieClient(async () => module);
+
+    client.setPurchaseController({
+      async onPurchase() {
+        throw new Error("rc unavailable");
+      },
+      async onRestore() {
+        throw new Error("restore unavailable");
+      },
+    });
+    await client.configure({ apiKey: "NX_TEST", usePurchaseController: true });
+
+    module.emit("onPurchaseRequest", {
+      requestId: "p_2",
+      platform: "ios",
+      productId: "sku_2",
+      timestampMs: Date.now(),
+    });
+    module.emit("onRestoreRequest", {
+      requestId: "r_2",
+      platform: "ios",
+      timestampMs: Date.now(),
+    });
+
+    await waitFor(() => module.completedPurchases.length === 1);
+    await waitFor(() => module.completedRestores.length === 1);
+
+    expect(module.completedPurchases[0]).toEqual({
+      requestId: "p_2",
+      result: {
+        type: "failed",
+        message: "rc unavailable",
+      },
+    });
+    expect(module.completedRestores[0]).toEqual({
+      requestId: "r_2",
+      result: {
+        type: "failed",
+        message: "restore unavailable",
+      },
+    });
+  });
 });

@@ -38,6 +38,8 @@ export class TestNativeModule implements NuxieNativeModule {
   } | null = null;
   public triggerStarts: Array<{ requestId: string; eventName: string; options?: TriggerOptions }> = [];
   public cancelledRequestIds: string[] = [];
+  public completedPurchases: Array<{ requestId: string; result: PurchaseResult }> = [];
+  public completedRestores: Array<{ requestId: string; result: RestoreResult }> = [];
 
   public throwOnStartTrigger = false;
 
@@ -164,9 +166,13 @@ export class TestNativeModule implements NuxieNativeModule {
 
   async resumeEventQueue(): Promise<void> {}
 
-  async completePurchase(_requestId: string, _result: PurchaseResult): Promise<void> {}
+  async completePurchase(requestId: string, result: PurchaseResult): Promise<void> {
+    this.completedPurchases.push({ requestId, result });
+  }
 
-  async completeRestore(_requestId: string, _result: RestoreResult): Promise<void> {}
+  async completeRestore(requestId: string, result: RestoreResult): Promise<void> {
+    this.completedRestores.push({ requestId, result });
+  }
 }
 
 export function triggerUpdate(

@@ -132,6 +132,13 @@ export interface FeatureAccess {
   type: FeatureType;
 }
 
+export interface FeatureAccessChangedEvent {
+  featureId: string;
+  from?: FeatureAccess | null;
+  to: FeatureAccess;
+  timestampMs: number;
+}
+
 export interface FeatureCheckResult {
   customerId: string;
   featureId: string;
@@ -163,6 +170,17 @@ export interface ProfileResponse {
   flows?: JsonValue;
   features?: JsonValue;
   [key: string]: JsonValue | undefined;
+}
+
+export interface FlowPresentedEvent {
+  flowId: string;
+  timestampMs: number;
+}
+
+export interface FlowDismissedEvent {
+  flowId: string;
+  reason?: string;
+  timestampMs: number;
 }
 
 export interface NuxieNativeError {

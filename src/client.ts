@@ -1,25 +1,59 @@
 import type {
   FeatureAccess,
   FeatureCheckResult,
+  FeatureAccessChangedEvent,
+  FlowDismissedEvent,
+  FlowPresentedEvent,
   FeatureUsageResult,
   NuxieConfigureOptions,
   NuxieConfigurationOptions,
+  NuxiePurchaseController,
+  PurchaseRequest,
   ProfileResponse,
+  RestoreRequest,
   TriggerOperation,
   TriggerOptions,
   TriggerTerminalUpdate,
   TriggerUpdate,
 } from "./types";
-import type { NuxieNativeEventMap, NuxieNativeModule, NuxieNativeSubscription } from "./native-module";
+import type {
+  NuxieNativeEventMap,
+  NuxieNativeEventName,
+  NuxieNativeModule,
+  NuxieNativeSubscription,
+} from "./native-module";
 import { resolveNativeModule } from "./native-module";
 
 const WRAPPER_VERSION = "0.1.0";
+
+export interface NuxieClientEventMap {
+  triggerUpdate: NuxieNativeEventMap["onTriggerUpdate"];
+  featureAccessChanged: FeatureAccessChangedEvent;
+  purchaseRequest: PurchaseRequest;
+  restoreRequest: RestoreRequest;
+  flowPresented: FlowPresentedEvent;
+  flowDismissed: FlowDismissedEvent;
+}
 
 interface TriggerOperationState {
   listeners: Set<(update: TriggerUpdate) => void>;
   resolve: (update: TriggerTerminalUpdate) => void;
   finished: boolean;
 }
+
+type ClientEventName = keyof NuxieClientEventMap;
+type ClientListenerMap = {
+  [K in ClientEventName]: Set<(payload: NuxieClientEventMap[K]) => void>;
+};
+
+const CLIENT_TO_NATIVE_EVENT: Record<ClientEventName, NuxieNativeEventName> = {
+  triggerUpdate: "onTriggerUpdate",
+  featureAccessChanged: "onFeatureAccessChanged",
+  purchaseRequest: "onPurchaseRequest",
+  restoreRequest: "onRestoreRequest",
+  flowPresented: "onFlowPresented",
+  flowDismissed: "onFlowDismissed",
+};
 
 function generateRequestId(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") {
@@ -71,9 +105,19 @@ export class NuxieClient {
   private readonly moduleResolver: () => Promise<NuxieNativeModule>;
   private modulePromise: Promise<NuxieNativeModule> | null = null;
   private triggerOperations = new Map<string, TriggerOperationState>();
-  private triggerSubscription: NuxieNativeSubscription | null = null;
+  private nativeSubscriptions = new Map<NuxieNativeEventName, NuxieNativeSubscription>();
+  private nativeSubscriptionPromises = new Map<NuxieNativeEventName, Promise<void>>();
+  private purchaseController: NuxiePurchaseController | null = null;
   private configured = false;
   private configuring = false;
+  private readonly listeners: ClientListenerMap = {
+    triggerUpdate: new Set(),
+    featureAccessChanged: new Set(),
+    purchaseRequest: new Set(),
+    restoreRequest: new Set(),
+    flowPresented: new Set(),
+    flowDismissed: new Set(),
+  };
 
   constructor(moduleResolver: () => Promise<NuxieNativeModule> = resolveNativeModule) {
     this.moduleResolver = moduleResolver;
@@ -87,6 +131,25 @@ export class NuxieClient {
     return this.configuring;
   }
 
+  on<K extends ClientEventName>(
+    eventName: K,
+    listener: (payload: NuxieClientEventMap[K]) => void,
+  ): () => void {
+    this.listeners[eventName].add(listener);
+    void this.ensureNativeSubscription(CLIENT_TO_NATIVE_EVENT[eventName]);
+    return () => {
+      this.listeners[eventName].delete(listener);
+    };
+  }
+
+  setPurchaseController(controller: NuxiePurchaseController | null): void {
+    this.purchaseController = controller;
+    if (controller != null) {
+      void this.ensureNativeSubscription("onPurchaseRequest");
+      void this.ensureNativeSubscription("onRestoreRequest");
+    }
+  }
+
   private async module(): Promise<NuxieNativeModule> {
     if (this.modulePromise == null) {
       this.modulePromise = this.moduleResolver();
@@ -94,14 +157,104 @@ export class NuxieClient {
     return this.modulePromise;
   }
 
-  private async ensureTriggerSubscription(): Promise<void> {
-    if (this.triggerSubscription != null) {
+  private emit<K extends ClientEventName>(eventName: K, payload: NuxieClientEventMap[K]): void {
+    for (const listener of this.listeners[eventName]) {
+      listener(payload);
+    }
+  }
+
+  private async ensureNativeSubscription(eventName: NuxieNativeEventName): Promise<void> {
+    if (this.nativeSubscriptions.has(eventName)) {
+      return;
+    }
+    const pending = this.nativeSubscriptionPromises.get(eventName);
+    if (pending != null) {
+      await pending;
+      return;
+    }
+    const createPromise = (async () => {
+      const module = await this.module();
+      if (this.nativeSubscriptions.has(eventName)) {
+        return;
+      }
+      const subscription = module.addListener(eventName, (payload) => {
+        this.routeNativeEvent(eventName, payload);
+      });
+      this.nativeSubscriptions.set(eventName, subscription);
+    })();
+    this.nativeSubscriptionPromises.set(eventName, createPromise);
+    try {
+      await createPromise;
+    } finally {
+      this.nativeSubscriptionPromises.delete(eventName);
+    }
+  }
+
+  private routeNativeEvent(eventName: NuxieNativeEventName, payload: NuxieNativeEventMap[NuxieNativeEventName]): void {
+    switch (eventName) {
+      case "onTriggerUpdate": {
+        const triggerPayload = payload as NuxieNativeEventMap["onTriggerUpdate"];
+        this.handleTriggerUpdate(triggerPayload);
+        this.emit("triggerUpdate", triggerPayload);
+        return;
+      }
+      case "onFeatureAccessChanged": {
+        this.emit("featureAccessChanged", payload as NuxieNativeEventMap["onFeatureAccessChanged"]);
+        return;
+      }
+      case "onPurchaseRequest": {
+        const purchasePayload = payload as NuxieNativeEventMap["onPurchaseRequest"];
+        this.emit("purchaseRequest", purchasePayload);
+        void this.handlePurchaseRequest(purchasePayload);
+        return;
+      }
+      case "onRestoreRequest": {
+        const restorePayload = payload as NuxieNativeEventMap["onRestoreRequest"];
+        this.emit("restoreRequest", restorePayload);
+        void this.handleRestoreRequest(restorePayload);
+        return;
+      }
+      case "onFlowPresented": {
+        this.emit("flowPresented", payload as NuxieNativeEventMap["onFlowPresented"]);
+        return;
+      }
+      case "onFlowDismissed": {
+        this.emit("flowDismissed", payload as NuxieNativeEventMap["onFlowDismissed"]);
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
+  private async handlePurchaseRequest(payload: NuxieNativeEventMap["onPurchaseRequest"]): Promise<void> {
+    const controller = this.purchaseController;
+    if (controller == null) {
       return;
     }
     const module = await this.module();
-    this.triggerSubscription = module.addListener("onTriggerUpdate", (payload) => {
-      this.handleTriggerUpdate(payload);
-    });
+    try {
+      const result = await controller.onPurchase(payload);
+      await module.completePurchase(payload.requestId, result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "purchase_failed";
+      await module.completePurchase(payload.requestId, { type: "failed", message });
+    }
+  }
+
+  private async handleRestoreRequest(payload: NuxieNativeEventMap["onRestoreRequest"]): Promise<void> {
+    const controller = this.purchaseController;
+    if (controller == null) {
+      return;
+    }
+    const module = await this.module();
+    try {
+      const result = await controller.onRestore(payload);
+      await module.completeRestore(payload.requestId, result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "restore_failed";
+      await module.completeRestore(payload.requestId, { type: "failed", message });
+    }
   }
 
   private handleTriggerUpdate(payload: NuxieNativeEventMap["onTriggerUpdate"]): void {
@@ -143,7 +296,14 @@ export class NuxieClient {
     try {
       const module = await this.module();
       const config = toNativeConfiguration(options);
-      await module.configure(options.apiKey, config, options.usePurchaseController === true, WRAPPER_VERSION);
+      const usePurchaseController = options.usePurchaseController === true || this.purchaseController != null;
+      await module.configure(options.apiKey, config, usePurchaseController, WRAPPER_VERSION);
+      await this.ensureNativeSubscription("onTriggerUpdate");
+      await this.ensureNativeSubscription("onFeatureAccessChanged");
+      if (usePurchaseController) {
+        await this.ensureNativeSubscription("onPurchaseRequest");
+        await this.ensureNativeSubscription("onRestoreRequest");
+      }
       this.configured = true;
     } finally {
       this.configuring = false;
@@ -155,11 +315,12 @@ export class NuxieClient {
     await module.shutdown();
     this.configured = false;
     this.configuring = false;
+    this.nativeSubscriptionPromises.clear();
 
-    if (this.triggerSubscription != null) {
-      this.triggerSubscription.remove();
-      this.triggerSubscription = null;
+    for (const [, subscription] of this.nativeSubscriptions) {
+      subscription.remove();
     }
+    this.nativeSubscriptions.clear();
     for (const [, operation] of this.triggerOperations) {
       if (!operation.finished) {
         operation.resolve(cancelledUpdate());
@@ -218,7 +379,7 @@ export class NuxieClient {
 
     void (async () => {
       try {
-        await this.ensureTriggerSubscription();
+        await this.ensureNativeSubscription("onTriggerUpdate");
         const module = await this.module();
         await module.startTrigger(requestId, eventName, opts);
       } catch (error) {
@@ -344,4 +505,3 @@ function toNativeConfiguration(config: NuxieConfigureOptions): NuxieConfiguratio
   } = config;
   return nativeConfig;
 }
-
