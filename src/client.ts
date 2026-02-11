@@ -342,8 +342,9 @@ export class NuxieClient {
       subscription.remove();
     }
     this.nativeSubscriptions.clear();
-    for (const [, operation] of this.triggerOperations) {
+    for (const [requestId, operation] of this.triggerOperations) {
       if (!operation.finished) {
+        await module.cancelTrigger(requestId).catch(() => undefined);
         operation.resolve(cancelledUpdate());
       }
     }
@@ -422,7 +423,7 @@ export class NuxieClient {
           return;
         }
         const module = await this.module();
-        await module.cancelTrigger(requestId);
+        await module.cancelTrigger(requestId).catch(() => undefined);
         const update = cancelledUpdate();
         for (const listener of existing.listeners) {
           listener(update);

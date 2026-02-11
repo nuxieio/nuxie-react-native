@@ -135,6 +135,24 @@ describe("NuxieClient", () => {
     });
   });
 
+  test("trigger cancellation still resolves when native cancel throws", async () => {
+    const module = new TestNativeModule();
+    module.throwOnCancelTrigger = true;
+    const client = new NuxieClient(async () => module);
+    const op = client.trigger("premium_tapped");
+
+    await waitFor(() => module.triggerStarts.length === 1);
+    await op.cancel();
+
+    expect(await op.done).toEqual({
+      kind: "error",
+      error: {
+        code: "trigger_cancelled",
+        message: "Trigger cancelled",
+      },
+    });
+  });
+
   test("trigger emits start error when native start fails", async () => {
     const module = new TestNativeModule();
     module.throwOnStartTrigger = true;
@@ -297,6 +315,26 @@ describe("NuxieClient", () => {
       result: {
         type: "failed",
         message: "restore unavailable",
+      },
+    });
+  });
+
+  test("shutdown cancels in-flight triggers and resolves done promises", async () => {
+    const module = new TestNativeModule();
+    const client = new NuxieClient(async () => module);
+
+    const op = client.trigger("event_before_shutdown");
+    await waitFor(() => module.triggerStarts.length === 1);
+    const requestId = module.triggerStarts[0]!.requestId;
+
+    await client.shutdown();
+
+    expect(module.cancelledRequestIds).toContain(requestId);
+    await expect(op.done).resolves.toEqual({
+      kind: "error",
+      error: {
+        code: "trigger_cancelled",
+        message: "Trigger cancelled",
       },
     });
   });

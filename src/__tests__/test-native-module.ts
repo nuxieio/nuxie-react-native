@@ -43,6 +43,7 @@ export class TestNativeModule implements NuxieNativeModule {
   public completedRestores: Array<{ requestId: string; result: RestoreResult }> = [];
 
   public throwOnStartTrigger = false;
+  public throwOnCancelTrigger = false;
 
   addListener<K extends NuxieNativeEventName>(
     eventName: K,
@@ -101,6 +102,9 @@ export class TestNativeModule implements NuxieNativeModule {
   }
 
   async cancelTrigger(requestId: string): Promise<void> {
+    if (this.throwOnCancelTrigger) {
+      throw new Error("cancel failed");
+    }
     this.cancelledRequestIds.push(requestId);
   }
 

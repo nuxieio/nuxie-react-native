@@ -23,7 +23,7 @@
     "expo-module.config.json"
   ],
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --format esm --sourcemap && tsc --declaration --emitDeclarationOnly --outDir dist",
+    "build": "bun build ./src/index.ts --outdir ./dist --format esm --sourcemap --external react --external react-native --external expo && tsc --declaration --emitDeclarationOnly --outDir dist",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "clean": "rm -rf dist coverage"
