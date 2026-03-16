@@ -616,6 +616,7 @@ private fun JourneyUpdate.toMap(): Map<String, Any?> {
 private fun JourneyExitReason.toMap(): String {
   return when (this) {
     JourneyExitReason.COMPLETED -> "completed"
+    JourneyExitReason.DISMISSED -> "dismissed"
     JourneyExitReason.GOAL_MET -> "goal_met"
     JourneyExitReason.TRIGGER_UNMATCHED -> "trigger_unmatched"
     JourneyExitReason.EXPIRED -> "expired"

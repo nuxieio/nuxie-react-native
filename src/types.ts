@@ -1,8 +1,21 @@
 export type JsonPrimitive = string | number | boolean | null;
-export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+export type JsonValue =
+  | JsonPrimitive
+  | JsonValue[]
+  | { [key: string]: JsonValue };
 
-export type NuxieLogLevel = "verbose" | "debug" | "info" | "warning" | "error" | "none";
-export type NuxieEnvironment = "production" | "staging" | "development" | "custom";
+export type NuxieLogLevel =
+  | "verbose"
+  | "debug"
+  | "info"
+  | "warning"
+  | "error"
+  | "none";
+export type NuxieEnvironment =
+  | "production"
+  | "staging"
+  | "development"
+  | "custom";
 export type EventLinkingPolicy = "keep_separate" | "migrate_on_identify";
 
 export interface NuxieConfigurationOptions {
@@ -81,6 +94,7 @@ export type EntitlementUpdate =
 
 export type JourneyExitReason =
   | "completed"
+  | "dismissed"
   | "goal_met"
   | "trigger_unmatched"
   | "expired"
@@ -109,19 +123,25 @@ export type TriggerUpdate =
   | { kind: "journey"; journey: JourneyUpdate }
   | { kind: "error"; error: TriggerError };
 
-export type TriggerTerminalUpdate = Extract<
-  TriggerUpdate,
-  { kind: "journey" } | { kind: "error" }
-> | {
-  kind: "decision";
-  decision: Extract<
-    TriggerDecision,
-    { type: "no_match" } | { type: "suppressed" } | { type: "allowed_immediate" } | { type: "denied_immediate" }
-  >;
-} | {
-  kind: "entitlement";
-  entitlement: Extract<EntitlementUpdate, { type: "allowed" } | { type: "denied" }>;
-};
+export type TriggerTerminalUpdate =
+  | Extract<TriggerUpdate, { kind: "journey" } | { kind: "error" }>
+  | {
+      kind: "decision";
+      decision: Extract<
+        TriggerDecision,
+        | { type: "no_match" }
+        | { type: "suppressed" }
+        | { type: "allowed_immediate" }
+        | { type: "denied_immediate" }
+      >;
+    }
+  | {
+      kind: "entitlement";
+      entitlement: Extract<
+        EntitlementUpdate,
+        { type: "allowed" } | { type: "denied" }
+      >;
+    };
 
 export type FeatureType = "boolean" | "metered" | "creditSystem";
 
