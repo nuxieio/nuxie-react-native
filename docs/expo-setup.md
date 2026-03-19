@@ -45,6 +45,14 @@ Example:
 ```json
 {
   "expo": {
+    "plugins": [
+      [
+        "@nuxie/react-native/plugin",
+        {
+          "apiKey": "NX_PROD_..."
+        }
+      ]
+    ],
     "ios": {
       "infoPlist": {
         "NSUserTrackingUsageDescription": "We use tracking to personalize flows.",
