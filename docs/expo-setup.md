@@ -37,6 +37,36 @@ Plugin behavior:
 - iOS: writes `NUXIE_API_KEY` to `Info.plist`
 - Android: writes `NUXIE_API_KEY` to app manifest metadata
 
+The plugin currently manages only `NUXIE_API_KEY`. If your flows use native
+permission actions, add the platform declarations in app config too.
+
+Example:
+
+```json
+{
+  "expo": {
+    "ios": {
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "We use tracking to personalize flows.",
+        "NSCameraUsageDescription": "We use the camera in onboarding flows.",
+        "NSMicrophoneUsageDescription": "We use the microphone in onboarding flows.",
+        "NSPhotoLibraryUsageDescription": "We use your photos in onboarding flows.",
+        "NSLocationWhenInUseUsageDescription": "We use your location while the app is open."
+      }
+    },
+    "android": {
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    }
+  }
+}
+```
+
 ## Configure In App
 
 You can provide `apiKey` in code, plugin config, or both.
@@ -49,6 +79,16 @@ await Nuxie.configure({
 ```
 
 If no key is found, `configure()` throws `MISSING_API_KEY`.
+
+## Native permission actions
+
+Flows using `request_notifications`, `request_tracking`, or
+`request_permission(...)` do not require any extra JS calls, but they do rely
+on native app configuration:
+
+- `request_tracking` is iOS-only
+- `request_permission("photos")` uses `READ_EXTERNAL_STORAGE` on Android 12 and
+  below, so add that permission if you still support those devices
 
 ## Build / Run
 
