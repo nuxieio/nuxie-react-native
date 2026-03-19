@@ -51,9 +51,10 @@ Typical native declarations for permission-based flows:
   - `NSPhotoLibraryUsageDescription`
   - `NSLocationWhenInUseUsageDescription`
 - Android:
+  - `android.permission.POST_NOTIFICATIONS`
   - `android.permission.CAMERA`
   - `android.permission.RECORD_AUDIO`
-  - `android.permission.READ_MEDIA_IMAGES` on Android 13+ or
+  - `android.permission.READ_MEDIA_IMAGES` on Android 13+ and
     `android.permission.READ_EXTERNAL_STORAGE` on Android 12 and below
   - `android.permission.ACCESS_COARSE_LOCATION` and/or
     `android.permission.ACCESS_FINE_LOCATION`

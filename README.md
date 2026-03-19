@@ -184,16 +184,18 @@ required. Host apps still need the matching native declarations:
   - `NSLocationWhenInUseUsageDescription` for
     `request_permission("location")`
 - Android:
+  - `android.permission.POST_NOTIFICATIONS` for `request_notifications`
   - `android.permission.CAMERA`
   - `android.permission.RECORD_AUDIO`
-  - `android.permission.READ_MEDIA_IMAGES` on Android 13+ or
+  - `android.permission.READ_MEDIA_IMAGES` on Android 13+ and
     `android.permission.READ_EXTERNAL_STORAGE` on Android 12 and below
   - `android.permission.ACCESS_COARSE_LOCATION` and/or
     `android.permission.ACCESS_FINE_LOCATION`
 
 `request_notifications` uses the native Android notification permission path
-provided by `nuxie-android`. `request_tracking` is iOS-only and should not be
-authored for Android apps.
+provided by `nuxie-android`, but Android 13+ apps still need
+`POST_NOTIFICATIONS` in the host manifest. `request_tracking` is iOS-only and
+should not be authored for Android apps.
 
 ## Example App + Runability Verification
 

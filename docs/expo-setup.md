@@ -56,9 +56,11 @@ Example:
     },
     "android": {
       "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ]
@@ -86,6 +88,8 @@ Flows using `request_notifications`, `request_tracking`, or
 `request_permission(...)` do not require any extra JS calls, but they do rely
 on native app configuration:
 
+- `request_notifications` needs `android.permission.POST_NOTIFICATIONS` on
+  Android 13+
 - `request_tracking` is iOS-only
 - `request_permission("photos")` uses `READ_EXTERNAL_STORAGE` on Android 12 and
   below, so add that permission if you still support those devices
