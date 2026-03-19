@@ -116,6 +116,11 @@ function Screen() {
 
 The plugin sets `NUXIE_API_KEY` in native config.
 
+The plugin does not currently add permission usage strings or dangerous
+permissions for flow-authored native permission actions. If your flows use
+`request_notifications`, `request_tracking`, or `request_permission(...)`, add
+the matching native config in your app project.
+
 `configure()` API key precedence:
 
 1. `options.apiKey`
@@ -165,6 +170,32 @@ const purchaseController: NuxiePurchaseController = {
 ```
 
 Outstanding purchase/restore requests have a native timeout (60s).
+
+## Native Permission Action Setup
+
+These flow actions run entirely in the native SDKs, so no new JS API is
+required. Host apps still need the matching native declarations:
+
+- iOS:
+  - `NSUserTrackingUsageDescription` for `request_tracking`
+  - `NSCameraUsageDescription` for `request_permission("camera")`
+  - `NSMicrophoneUsageDescription` for `request_permission("microphone")`
+  - `NSPhotoLibraryUsageDescription` for `request_permission("photos")`
+  - `NSLocationWhenInUseUsageDescription` for
+    `request_permission("location")`
+- Android:
+  - `android.permission.POST_NOTIFICATIONS` for `request_notifications`
+  - `android.permission.CAMERA`
+  - `android.permission.RECORD_AUDIO`
+  - `android.permission.READ_MEDIA_IMAGES` on Android 13+ and
+    `android.permission.READ_EXTERNAL_STORAGE` on Android 12 and below
+  - `android.permission.ACCESS_COARSE_LOCATION` and/or
+    `android.permission.ACCESS_FINE_LOCATION`
+
+`request_notifications` uses the native Android notification permission path
+provided by `nuxie-android`, but Android 13+ apps still need
+`POST_NOTIFICATIONS` in the host manifest. `request_tracking` is iOS-only and
+should not be authored for Android apps.
 
 ## Example App + Runability Verification
 
